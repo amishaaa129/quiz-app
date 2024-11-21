@@ -1,6 +1,6 @@
-# Quiz App
+# Quiz App Project
 
-A simple quiz app built with Node.js, Express, and EJS.
+A simple tech quiz app built with Node.js, Express, and EJS.
 
 ## Features
 - Randomized questions
