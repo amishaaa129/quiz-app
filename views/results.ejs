@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score</title>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+</head>
+<body>
+    <h1>Your Score: <%= correctAnswers %>/<%= totalQuestions %></h1>
+    <p><strong>Remark:</strong> <%= remark %></p>
+
+    <script>
+        // Replace the current page with the results page in the browser's history
+        history.replaceState(null, null, location.href);
+
+        // Block back navigation and keep users on the results page
+        window.onpopstate = function () {
+            history.replaceState(null, null, location.href);
+            alert("You cannot go back after completing the quiz!");
+        };
+    </script>
+</body>
+</html>

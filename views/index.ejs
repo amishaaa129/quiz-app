@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question <%= questionNumber %></title>
+
+</head>
+<body>
+    <h1>Q <%= questionNumber %>. <%= question.question %></h1>
+    <form action="/submit-answer" method="POST">
+        <% question.options.forEach((option,index) => { %>
+            <div>
+                <input type="radio" name="answer" value="<%= option %>" id="option<%= index %>">
+                <label for="option<%= index %>"><%= option %></label>
+            </div>
+        <% }); %>
+
+        <input type="hidden" name="currentQuestionId" value="<%= question.id %>">
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        // Prevent back button navigation
+        history.pushState(null, null, window.location.href);
+        window.onpopstate = function () {
+          history.pushState(null, null, window.location.href);
+        };
+      </script>
+    
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Quiz</title>
+    
+</head>
+<body>
+    <div class="container">
+        <div class="basic-details">
+            <h1>Are you ready for a Tech Quiz?</h1>
+            <h3>Fill in your details below</h3>
+        </div>
+        <div class="form">
+            <form action="/question" method="post">
+                <label for="fname">First name:</label><br>
+                <input type="text" id="fname" name="fname" placeholder="Enter your first name" required><br>
+                <label for="lname">Last name:</label><br>
+                <input type="text" id="lname" name="lname" placeholder="Enter your last name" required><br>
+                <label for="email">Email Id:</label><br>
+                <input type="text" id="email" name="email" placeholder="Enter your email" required><br><br>
+                <input type="submit" value="Submit">
+              </form>
+        </div>
+    </div>
+
+    <script>
+        // Prevent back button navigation
+        history.pushState(null, null, window.location.href);
+        window.onpopstate = function () {
+          history.pushState(null, null, window.location.href);
+        };
+      </script>
+</body>
+</html>
