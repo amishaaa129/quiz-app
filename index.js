@@ -22,8 +22,6 @@ app.use(
 );
 
 app.get("/", (req, res) => {
-  // Reset score, question number, and session data
-  score = 0;
   qNO = 1;
   req.session.results = [];
   req.session.answeredQuestions = [];
