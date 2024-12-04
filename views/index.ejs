@@ -4,22 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Question <%= questionNumber %></title>
-    <link rel="stylesheet" href="/QUIZ PROJECT/public/styles.css">
-
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <h1>Q <%= questionNumber %>. <%= question.question %></h1>
-    <form action="/submit-answer" method="POST">
+    <div class="container">
+    <div class="question"><h1>Q <%= questionNumber %>. <%= question.question %></h1></div>
+    <div class="options grid-container">
+     <form action="/submit-answer" method="POST">
         <% question.options.forEach((option,index) => { %>
-            <div>
-                <input type="radio" name="answer" value="<%= option %>" id="option<%= index %>">
-                <label for="option<%= index %>"><%= option %></label>
-            </div>
+                <input class="radio-button" type="radio" name="answer" value="<%= option %>" id="option<%= index %>">
+                <label class="radio-label" for="option<%= index %>"><%= option %></label>
         <% }); %>
 
         <input type="hidden" name="currentQuestionId" value="<%= question.id %>">
         <button type="submit">Submit</button>
     </form>
+    </div>
 
     <script>
         // Prevent back button navigation

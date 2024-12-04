@@ -1,10 +1,20 @@
 import express from "express";
 import bodyParser from "body-parser";
+import pg from "pg";
 
 const app = express();
 const port = 3000;
 var score=0;
 var qNO=1;
+
+const db = new pg.Client({
+  user: "postgres",
+  host: "localhost",
+  database: "quiz_project",
+  password: "strangert3",
+  port: 5432,
+});
+db.connect();
 
 app.use(bodyParser.urlencoded({extended: true}));
 
@@ -17,7 +27,7 @@ app.use(
         secret: 'your-secret-key',
         resave: false,
         saveUninitialized: true,
-        cookie: { secure: false }, // Use true if HTTPS is enabled
+        cookie: { secure: false }, 
     })
 );
 
@@ -25,10 +35,28 @@ app.get("/", (req, res) => {
   qNO = 1;
   req.session.results = [];
   req.session.answeredQuestions = [];
+});
+
+app.post('/', async (req, res) => {
+  const { fname, lname, email } = req.body;
+
+  // Checking if user already exists
+  const userResult = await db.query('SELECT * FROM scores WHERE email = $1', [email]);
   
-  // Redirect to the first question or home page
+  if (userResult.rows.length > 0) {
+    // User exists so updating the session with existing user information
+    req.session.user = userResult.rows[0];
+  } else {
+    // Inserting new user
+    const newUserResult = await db.query(
+      'INSERT INTO scores (fname, lname, email, max_score) VALUES ($1, $2, $3, $4) RETURNING *',
+      [fname, lname, email, 0]
+    );
+    req.session.user = newUserResult.rows[0];
+  }
   res.redirect("/question");
 });
+
 
   app.post("/question", (req,res) => {
     const randomIndex=Math.floor(Math.random() * questions.length);
@@ -45,55 +73,67 @@ app.get("/", (req, res) => {
         req.session.answeredQuestions = [];
     }
 
-    // Filter out already answered questions
+    // Filtering out already answered questions
     const unansweredQuestions = questions.filter(
         (q) => !req.session.answeredQuestions.includes(q.id)
     );
 
-    // If the user has answered 5 questions, redirect to the results page
+    // If the user has answered 5 questions, redirecting to the results page
     if (req.session.answeredQuestions.length >= 5) {
       qNO=1;
       req.session.answeredQuestions = [];
       return res.redirect('/results');
     }
 
-    // Select a random unanswered question
+    // Selecting a random unanswered question
     const randomIndex = Math.floor(Math.random() * unansweredQuestions.length);
     const randomQuestion = unansweredQuestions[randomIndex];
 
-    // Send the question to the EJS template
+    // Sending the question to the EJS template
     res.render("index.ejs", { question: randomQuestion, questionNumber: qNO++, });
 });
   
 
-app.post("/submit-answer", (req, res) => {
+app.post("/submit-answer", async (req, res) => {
   const userAnswer = req.body.answer;
   const questionId = parseInt(req.body.currentQuestionId);
-
   const currentQuestion = questions.find((q) => q.id === questionId);
 
   if (!currentQuestion) {
     return res.status(404).send('Question not found');
   }
 
-  // Initialize session properties if not already set
+  // Initialising session properties if not already set
   if (!req.session.results) {
-    req.session.results = []; // Only initialize the results array if it doesn't already exist
+    req.session.results = [];
   }
 
   if (!req.session.answeredQuestions) {
     req.session.answeredQuestions = [];
   }
 
-  // Add the current question to answered questions and store the result
+  // Adding the current question to answered questions and storing the result
   req.session.answeredQuestions.push(currentQuestion.id);
+  const isCorrect = userAnswer === currentQuestion.answer;
   req.session.results.push({
     questionId: currentQuestion.id,
     userAnswer,
-    isCorrect: userAnswer === currentQuestion.answer,
+    isCorrect,
   });
 
-  // Redirect to the next random question
+  // Updating user's max score in the database if needed
+  if (isCorrect) {
+    const email = req.session.user.email;
+    const currentMaxScore = req.session.user.max_score;
+    const newMaxScore = Math.max(currentMaxScore, req.session.results.filter((r) => r.isCorrect).length);
+
+    if (newMaxScore > currentMaxScore) {
+      await db.query('UPDATE scores SET max_score = $1 WHERE email = $2', [newMaxScore, email]);
+      req.session.user.max_score = newMaxScore; 
+    }
+  }
+
+  // Redirecting to the next random question
   res.redirect("/question");
 });
 
@@ -124,7 +164,10 @@ app.get("/results", (req, res) => {
 
   const remark = getRemark(correctAnswers);
 
-  res.render("results.ejs", { correctAnswers, totalQuestions, remark });
+  const max_score=req.session.user.max_score;
+
+  res.render("results.ejs", { correctAnswers, totalQuestions, remark, max_score });
+
 
   // Clear the session data after displaying results
   req.session.results = [];
@@ -133,10 +176,9 @@ app.get("/results", (req, res) => {
   req.session.destroy();
 });
 
-
-
-
-app.listen(port);
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
 
 var questions= [
   {
@@ -318,5 +360,186 @@ var questions= [
     "question": "What does 'BIOS' stand for in a computer system?",
     "options": ["Basic Input/Output System", "Binary Integrated Operating System", "Basic Internet Operating Setup", "Basic Infrastructure of Systems"],
     "answer": "Basic Input/Output System"
-  }
+  },
+  {
+    "id": 31,
+    "question": "What does 'SQL' stand for?",
+    "options": ["Structured Query Language", "Simple Query Language", "Secure Query Language", "System Query Language"],
+    "answer": "Structured Query Language"
+},
+{
+    "id": 32,
+    "question": "Which HTML tag is used to create a hyperlink?",
+    "options": ["<link>", "<a>", "<href>", "<hyperlink>"],
+    "answer": "<a>"
+},
+{
+    "id": 33,
+    "question": "What is the main purpose of RAID (Redundant Array of Independent Disks) in computing?",
+    "options": ["To increase storage capacity", "To improve data redundancy and performance", "To enhance graphics performance", "To increase network speed"],
+    "answer": "To improve data redundancy and performance"
+},
+{
+    "id": 34,
+    "question": "Which company developed the Linux operating system?",
+    "options": ["IBM", "Microsoft", "Linus Torvalds", "Google"],
+    "answer": "Linus Torvalds"
+},
+{
+    "id": 35,
+    "question": "In programming, what is a 'loop' used for?",
+    "options": ["To perform a repetitive task", "To store data", "To define a function", "To display output"],
+    "answer": "To perform a repetitive task"
+},
+{
+    "id": 36,
+    "question": "What is the full form of 'RAM'?",
+    "options": ["Random Access Memory", "Readily Accessible Memory", "Read and Modify", "Real-time Access Memory"],
+    "answer": "Random Access Memory"
+},
+{
+    "id": 37,
+    "question": "Which technology is used to create interactive effects within web browsers?",
+    "options": ["HTML", "CSS", "JavaScript", "PHP"],
+    "answer": "JavaScript"
+},
+{
+    "id": 38,
+    "question": "What is the primary purpose of a DNS (Domain Name System)?",
+    "options": ["To translate domain names into IP addresses", "To secure internet connections", "To manage email accounts", "To host websites"],
+    "answer": "To translate domain names into IP addresses"
+},
+{
+    "id": 39,
+    "question": "Which of the following is a server-side scripting language?",
+    "options": ["HTML", "CSS", "JavaScript", "PHP"],
+    "answer": "PHP"
+},
+{
+    "id": 40,
+    "question": "What is the default port number for HTTP?",
+    "options": ["21", "25", "80", "443"],
+    "answer": "80"
+},
+{
+    "id": 41,
+    "question": "Who is known as the inventor of the World Wide Web?",
+    "options": ["Bill Gates", "Steve Jobs", "Tim Berners-Lee", "Mark Zuckerberg"],
+    "answer": "Tim Berners-Lee"
+},
+{
+    "id": 42,
+    "question": "What is a 'byte' in computer terminology?",
+    "options": ["8 bits", "16 bits", "32 bits", "64 bits"],
+    "answer": "8 bits"
+},
+{
+    "id": 43,
+    "question": "Which of the following is a distributed version control system?",
+    "options": ["Git", "SVN", "Mercurial", "All of the above"],
+    "answer": "All of the above"
+},
+{
+    "id": 44,
+    "question": "What does 'URL' stand for?",
+    "options": ["Uniform Resource Locator", "Uniform Retrieval Locator", "Universal Resource Locator", "Universal Retrieval Locator"],
+    "answer": "Uniform Resource Locator"
+},
+{
+    "id": 45,
+    "question": "In web development, what does 'API' stand for?",
+    "options": ["Application Programming Interface", "Application Process Integration", "Advanced Programming Interface", "Application Programming Interchange"],
+    "answer": "Application Programming Interface"
+},
+{
+    "id": 46,
+    "question": "What is the name of the first electronic general-purpose computer?",
+    "options": ["ENIAC", "UNIVAC", "IBM 701", "Altair 8800"],
+    "answer": "ENIAC"
+},
+{
+    "id": 47,
+    "question": "Which language is primarily used for scientific computing and data analysis?",
+    "options": ["Python", "Java", "C++", "Ruby"],
+    "answer": "Python"
+},
+{
+    "id": 48,
+    "question": "What does 'HTTPS' stand for?",
+    "options": ["HyperText Transfer Protocol Secure", "High Transfer Text Protocol Secure", "HyperTerminal Transfer Process Secure", "Hyperlink Transmission Protocol Secure"],
+    "answer": "HyperText Transfer Protocol Secure"
+},
+{
+    "id": 49,
+    "question": "What is the name of the Google-developed programming language that aims to simplify web development?",
+    "options": ["Dart", "Go", "Kotlin", "Rust"],
+    "answer": "Dart"
+},
+{
+    "id": 50,
+    "question": "Which file extension is used for Python files?",
+    "options": [".py", ".java", ".cpp", ".rb"],
+    "answer": ".py"
+},
+{
+    "id": 51,
+    "question": "In networking, what does 'VPN' stand for?",
+    "options": ["Virtual Private Network", "Virtual Public Network", "Virtual Personal Network", "Virtual Protected Network"],
+    "answer": "Virtual Private Network"
+},
+{
+    "id": 52,
+    "question": "What does 'GUI' stand for?",
+    "options": ["Graphical User Interface", "Global User Interface", "Graphical Unified Interface", "General User Interface"],
+    "answer": "Graphical User Interface"
+},
+{
+    "id": 53,
+    "question": "What is the main purpose of an IP address?",
+    "options": ["To identify a device on a network", "To secure a network connection", "To increase internet speed", "To manage user accounts"],
+    "answer": "To identify a device on a network"
+},
+{
+    "id": 54,
+    "question": "Which programming language is used for developing Android applications?",
+    "options": ["Swift", "Java", "Kotlin", "JavaScript"],
+    "answer": "Kotlin"
+},
+{
+    "id": 55,
+    "question": "What does 'SEO' stand for in digital marketing?",
+    "options": ["Search Engine Optimization", "Social Engagement Optimization", "Search Efficiency Optimization", "Social Engine Optimization"],
+    "answer": "Search Engine Optimization"
+},
+{
+    "id": 56,
+    "question": "Which protocol is used for secure web browsing?",
+    "options": ["HTTP", "FTP", "SMTP", "HTTPS"],
+    "answer": "HTTPS"
+},
+{
+    "id": 57,
+    "question": "Which company developed the Java programming language?",
+    "options": ["Microsoft", "Sun Microsystems", "Apple", "Google"],
+    "answer": "Sun Microsystems"
+},
+{
+    "id": 58,
+    "question": "What type of attack involves overwhelming a system with traffic?",
+    "options": ["Phishing", "Man-in-the-Middle", "DDoS", "Ransomware"],
+    "answer": "DDoS"
+},
+{
+    "id": 59,
+    "question": "Which language is used for querying databases?",
+    "options": ["HTML", "CSS", "SQL", "Java"],
+    "answer": "SQL"
+},
+{
+    "id": 60,
+    "question": "What is the primary function of a compiler?",
+    "options": ["To execute code", "To translate code into machine language", "To debug code", "To optimize code"],
+    "answer": "To translate code into machine language"
+},
+
 ]
